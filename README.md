@@ -14,11 +14,12 @@ The program use the API provided by NightScout and the API founded in Diabby Web
 # Docker version 
 To launch the docker version :
 
-Build the docker image and 
-docker run -it --rm -v "$PWD/filestorage":/app/filestorage nightscout2diabby
+Build the docker image 
 
-docker run -it --rm -v "/Users/pierre/Documents/Personnel/code/syncNightScout2Diabby/filestorage":/app/filestorage nightscout2diabby
+`docker build -t nightscout2diabby .`
 
-to build the docker : 
-docker build -t nightscout2diabby .
+and after run docker 
+
+`docker run -it --rm -v "$PWD/filestorage":/app/filestorage nightscout2diabby`
+
 
