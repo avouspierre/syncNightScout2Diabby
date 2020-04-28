@@ -1,10 +1,12 @@
 import requests
 import datetime
-from pytz import timezone
+import pytz
 import json
 import os
 import shutil
 import logging
+#import MyLifeSiteWebScrapinLastData
+#import dataInsulin
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -18,7 +20,7 @@ db_file_SGV = "DB_SGV.csv"
 diabbyLineTemplate = "FreeStyle LibreLink,ABAFDA43-2C2D-4F87-9847-72D3CEC39EA1,%s,0,%s,,,,,,,,,,,,,,\n"
 
 
-UTC = timezone("Europe/Paris")
+UTC = pytz.timezone("Europe/Paris")
 
 __location__ = os.path.realpath(
     os.path.join(os.getcwd(), os.path.dirname(__file__)))
@@ -26,11 +28,7 @@ __location__ = os.path.realpath(
 nameOfFileDiabby = os.path.join("filestorage",db_file_SGV)
 nameOfFileDiabbyCp = os.path.join("filestorage","save_" + db_file_SGV)
 
-
 baseUrlDiabby = "https://app.mydiabby.com/api"
-
-
-
 
 # Convert Date Diabby String in DateTime
 def convertDateDiabbyInDateTime(DateString):
@@ -49,7 +47,6 @@ def convertEpochMmsInDateTime(datestamp):
     dateFromdatestamp = datetime.datetime.fromtimestamp(datestamp / 1000)
     dateFromdatestamp.astimezone(UTC)
     return dateFromdatestamp
-
 
 # Query data from NightScout
 # dateFirst : dateTime of the first data
@@ -71,6 +68,36 @@ def getSGVFromNS(dateFirst,dateEnd):
     response_in_json = json.loads(response.text.encode('utf8'))
     response_in_json= sorted(response_in_json,key = lambda i: i['date'])
     return response_in_json
+
+# Query data from NightScout
+# dateFirst : dateTime of the first data
+# dateEnd : dateTime of the last data
+def getLastInsulinFromNS():
+    
+    payload = {}
+    headers = {
+        'Accept': 'application/json'
+    }
+
+    url =  "%s/treatments?count=10&token=%s" % (baseUrlNS,TOKEN_NS)
+
+    response = requests.request("GET", url, headers=headers, data = payload)
+    response_in_json = json.loads(response.text.encode('utf8'))
+    #response_in_json= sorted(response_in_json,key = lambda i: i['date'])
+    #TODO : manage correctly !!!!!!
+    if not "Sensor" in response_in_json[0]['eventType']:
+        lastdate_1 = datetime.datetime.strptime(response_in_json[0]['created_at'], "%Y-%m-%dT%H:%M:%S.%fZ")
+        timezone = pytz.utc
+        lastdate = timezone.localize(lastdate_1).astimezone(UTC)
+        event_type = response_in_json[0]['eventType']
+        lastvalue = response_in_json[0]['insulin']
+    else:
+        lastdate = datetime.now - days(30)
+        event_type = ""
+        lastvalue = ""  
+    return lastdate,event_type,lastvalue
+
+
 
 # extract the last date/time of the data
 def extractLastDateOfDiabby():
@@ -124,15 +151,14 @@ def pushDiabbyFileInDiabby(filename):
 
 def main():
     logging.basicConfig(filename=os.path.join('filestorage','NS2D.log'),level=logging.INFO)
-    logging.info("start of the launch: %s" % datetime.datetime.now().strftime("%Y-%m-%d %H:%M"))
+    logging.info("start of the process: %s" % datetime.datetime.now().strftime("%Y-%m-%d %H:%M"))
+
+    # process to collect data glycemia from NS
 
     dateStart = convertDateDiabbyInDateTime(extractLastDateOfDiabby())
     logging.info("date of the start Data: %s" % dateStart.strftime("%Y-%m-%d %H:%M"))
-
-    # #just extract one day of data
-    dateEnd = dateStart + datetime.timedelta(days=1)
+    dateEnd =  datetime.datetime.now()  # dateStart + datetime.timedelta(days=1)
     logging.info("date of the end Data: %s" % dateEnd.strftime("%Y-%m-%d %H:%M"))
-
     SgvDatas = getSGVFromNS(dateStart,dateEnd)
     logging.info("nb of data from NS: %s" % len(SgvDatas))
 
@@ -142,5 +168,15 @@ def main():
     else:
         logging.error("Issue with data loading in Diabby")
 
-if __name__ == "__main__":
+    # TODO Management of the data provided by MyLife
+    # Process to push insulin to NS
+    #logging.info("try to collect the last data from NS")
+    #lastdate,event_type,lastvalue= getLastInsulinFromNS()
+    #collect all data from MyLife
+    #dataInsulin = MyLifeSiteWebScrapingLastData.ScrapMyLife()
+    #last date please
+    #if (dataInsulin[0].date > lastdate):
+    #    #print("%s:%s" % (dataInsulin[0].date,lastdate))
+                
+if (__name__ == "__main__"):
     main()

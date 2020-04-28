@@ -144,3 +144,7 @@ static
 
 # mac
 .DS_Store
+
+# specific for the app
+dockerunprogram.sh
+*.csv
