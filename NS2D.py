@@ -8,20 +8,22 @@ import logging
 #import MyLifeSiteWebScrapinLastData
 #import dataInsulin
 
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+
+# management of the env variable
 from dotenv import load_dotenv
 load_dotenv()
 TOKEN_NS = os.getenv('TOKEN_NS')
 TOKEN_DIABBY = os.getenv('TOKEN_DIABBY')
 USERNAME_DIABBY = os.getenv('USERNAME_DIABBY')
-
 baseUrlNS = os.getenv('BASEURLNS') + "/api/v1"
-# 
+
+
+# other constants
 db_file_SGV = "DB_SGV.csv"
 diabbyLineTemplate = "FreeStyle LibreLink,ABAFDA43-2C2D-4F87-9847-72D3CEC39EA1,%s,0,%s,,,,,,,,,,,,,,\n"
-
-
 UTC = pytz.timezone("Europe/Paris")
-
 __location__ = os.path.realpath(
     os.path.join(os.getcwd(), os.path.dirname(__file__)))
 
@@ -29,6 +31,14 @@ nameOfFileDiabby = os.path.join("filestorage",db_file_SGV)
 nameOfFileDiabbyCp = os.path.join("filestorage","save_" + db_file_SGV)
 
 baseUrlDiabby = "https://app.mydiabby.com/api"
+
+# model for the result in the API case
+class Result(BaseModel):
+    success: bool
+    nb: int
+
+# start the server for the API 
+app = FastAPI()
 
 # Convert Date Diabby String in DateTime
 def convertDateDiabbyInDateTime(DateString):
@@ -83,6 +93,7 @@ def getLastInsulinFromNS():
 
     response = requests.request("GET", url, headers=headers, data = payload)
     response_in_json = json.loads(response.text.encode('utf8'))
+    
     #response_in_json= sorted(response_in_json,key = lambda i: i['date'])
     #TODO : manage correctly !!!!!!
     if not "Sensor" in response_in_json[0]['eventType']:
@@ -103,12 +114,11 @@ def getLastInsulinFromNS():
 def extractLastDateOfDiabby():
     with open(os.path.join(__location__, nameOfFileDiabby), "r") as f1:
         last_line = f1.readlines()[-1]
-    
-    
     return last_line.split(",")[2]
 
 
 # add new data in Diabby file
+# TODO : find a solution to create the file on the fly only
 def addDataInDiabbyFile(SgvDatas,fake=False):
     #copy the original file in case of issue
     shutil.copy(os.path.join(__location__, nameOfFileDiabby),os.path.join(__location__, nameOfFileDiabbyCp))
@@ -118,8 +128,6 @@ def addDataInDiabbyFile(SgvDatas,fake=False):
             f1.write('\n')
             for sgv in SgvDatas:
                 f1.write(diabbyLineTemplate % (convertDateTimeInDateDiabby(convertEpochMmsInDateTime(sgv['date'])),sgv['sgv'])) 
-                #print(diabbyLineTemplate % (convertDateTimeInDateDiabby(convertEpochMmsInDateTime(sgv['date'])),sgv['sgv'])) 
-    
     return True
 
 
@@ -146,10 +154,10 @@ def pushDiabbyFileInDiabby(filename):
     }
 
     response = requests.request("POST", url, headers=headers, data = payload, files = files)
-    return response.text.encode('utf8')
+    return json.loads(response.text)
     
-
-def main():
+@app.get('/ns2d', response_model=Result)
+def NS2D():
     logging.basicConfig(filename=os.path.join('filestorage','NS2D.log'),level=logging.INFO)
     logging.info("start of the process: %s" % datetime.datetime.now().strftime("%Y-%m-%d %H:%M"))
 
@@ -165,9 +173,12 @@ def main():
     if addDataInDiabbyFile(SgvDatas,fake=False):
         result = pushDiabbyFileInDiabby(os.path.join(__location__, nameOfFileDiabby))
         logging.info(result)
+        response= result
     else:
         logging.error("Issue with data loading in Diabby")
+        raise HTTPException(status_code=404, detail="Unable to load data in Diabby")
 
+    return response
     # TODO Management of the data provided by MyLife
     # Process to push insulin to NS
     #logging.info("try to collect the last data from NS")
@@ -177,6 +188,3 @@ def main():
     #last date please
     #if (dataInsulin[0].date > lastdate):
     #    #print("%s:%s" % (dataInsulin[0].date,lastdate))
-                
-if (__name__ == "__main__"):
-    main()

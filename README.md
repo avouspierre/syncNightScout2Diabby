@@ -1,8 +1,9 @@
-# A simple program to sync data between Diabby and NightScout. 
+# A simple API service to sync data between Diabby and NightScout. 
 
-docker run -it -e "TZ=Europe/Paris"  --rm -v "$PWD/filestorage":/app/filestorage nightscout2diabby
+`docker run -d -p 80:80 -e MODULE_NAME="NS2D" -e "TZ=Europe/Paris"  -v "$PWD/filestorage":/app/filestorage nightscout2diabby`
 
 The program use the API provided by NightScout and the API founded in Diabby Web Site. 
+Use FastAPI Service
 
 ## Current version functions 
 
@@ -22,6 +23,9 @@ Build the docker image
 
 and after run docker 
 
-`docker run -it --rm -v "$PWD/filestorage":/app/filestorage nightscout2diabby`
+`docker run -d -p 80:80 -e MODULE_NAME="NS2D" -e "TZ=Europe/Paris"  -v "$PWD/filestorage":/app/filestorage nightscout2diabby`
+
+
+
 
 
