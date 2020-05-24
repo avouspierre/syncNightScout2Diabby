@@ -148,3 +148,4 @@ static
 # specific for the app
 dockerunprogram.sh
 *.csv
+table.html
