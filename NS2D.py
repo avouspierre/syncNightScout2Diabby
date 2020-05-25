@@ -1,5 +1,5 @@
 import requests
-import datetime
+from datetime import datetime
 import pytz
 import json
 import os
@@ -48,7 +48,7 @@ app = FastAPI()
 
 # Convert Date Diabby String in DateTime
 def convertDateDiabbyInDateTime(DateString):
-    return datetime.datetime.strptime(DateString, "%m-%d-%Y %I:%M %p").astimezone(UTC)
+    return datetime.strptime(DateString, "%m-%d-%Y %I:%M %p").astimezone(UTC)
 
 
 # Convert DateTime in Date Diabby String
@@ -63,7 +63,7 @@ def convertDateTimeInEpochMms(OneDate):
 
 # Convert Epoch in Epoch
 def convertEpochMmsInDateTime(datestamp):
-    dateFromdatestamp = datetime.datetime.fromtimestamp(datestamp / 1000)
+    dateFromdatestamp = datetime.fromtimestamp(datestamp / 1000)
     dateFromdatestamp.astimezone(UTC)
     return dateFromdatestamp
 
@@ -102,18 +102,18 @@ def getLastInsulinFromNS():
 
     response = requests.request("GET", url, headers=headers, data=payload)
     response_in_json = json.loads(response.text.encode('utf8'))
-    # response_in_json= sorted(response_in_json,key = lambda i: i['date'])
-    # TODO : manage correctly !!!!!!
-    if not "Sensor" in response_in_json[0]['eventType']:
-        lastdate_1 = datetime.datetime.strptime(response_in_json[0]['created_at'], "%Y-%m-%dT%H:%M:%S.%fZ")
-        timezone = pytz.utc
-        lastdate = timezone.localize(lastdate_1).astimezone(UTC)
-        event_type = response_in_json[0]['eventType']
-        lastvalue = response_in_json[0]['insulin']
-    else:
-        lastdate = datetime.now - days(30)
-        event_type = ""
-        lastvalue = ""
+    logging.info(response_in_json)
+    # Manage to find the last date with Insulina information (and not sensor start...)
+    i = 0
+    while "Sensor" in response_in_json[i]['eventType']:
+        i = i + 1
+
+    lastdate_1 = datetime.strptime(response_in_json[i]['created_at'], "%Y-%m-%dT%H:%M:%S.%fZ")
+    timezone = pytz.utc
+    lastdate = timezone.localize(lastdate_1).astimezone(UTC)
+    event_type = response_in_json[i]['eventType']
+    lastvalue = response_in_json[i]['insulin']
+    lastvalue = response_in_json[i]['insulin']
     return lastdate, event_type, lastvalue
 
 
@@ -126,7 +126,7 @@ def extractLastDateOfDiabby():
 
 # add new data in Diabby file
 # TODO : find a solution to create the file on the fly only
-def addDataInDiabbyFile(SgvDatas,fake=False):
+def addDataInDiabbyFile(SgvDatas, fake=False):
     # copy the original file in case of issue
     shutil.copy(os.path.join(__location__, nameOfFileDiabby), os.path.join(__location__, nameOfFileDiabbyCp))
 
@@ -154,7 +154,7 @@ def pushDiabbyFileInDiabby(filename):
     url = baseUrlDiabby + "/upload-data/freestyle"
     payload = {}
     files = [
-         ('file', open(filename, 'rb'))
+        ('file', open(filename, 'rb'))
     ]
     headers = {
         'Authorization': token
@@ -162,17 +162,18 @@ def pushDiabbyFileInDiabby(filename):
 
     response = requests.request("POST", url, headers=headers, data=payload, files=files)
     return json.loads(response.text)
-    
 
+
+# service to push NS to Diabby App
 @app.get('/ns2d', response_model=Result)
 def NS2D():
-    logging.info("start of the process: %s" % datetime.datetime.now().strftime("%Y-%m-%d %H:%M"))
+    logging.info("start of the process: %s" % datetime.now().strftime("%Y-%m-%d %H:%M"))
 
     # process to collect data glycemia from NS
 
     dateStart = convertDateDiabbyInDateTime(extractLastDateOfDiabby())
     logging.info("date of the start Data: %s" % dateStart.strftime("%Y-%m-%d %H:%M"))
-    dateEnd = datetime.datetime.now()  # dateStart + datetime.timedelta(days=1)
+    dateEnd = datetime.now()  # dateStart + datetime.timedelta(days=1)
     logging.info("date of the end Data: %s" % dateEnd.strftime("%Y-%m-%d %H:%M"))
     SgvDatas = getSGVFromNS(dateStart, dateEnd)
     logging.info("nb of data from NS: %s" % len(SgvDatas))
@@ -188,9 +189,9 @@ def NS2D():
     return response
 
 
+# Service to push Ypsomed Insulina Value to NS
 @app.get('/ypso2ns')
 def Ypsomed2NS():
-    # TODO Management of the data provided by MyLife
     # Process to push insulin to NS
     logger.info("try to collect the last data from NS")
     lastdate, event_type, lastvalue = getLastInsulinFromNS()
@@ -198,7 +199,6 @@ def Ypsomed2NS():
     # collect all data from MyLife
     dataInsulin = MyLifeSiteWebScrapingLastData.ScrapMyLife(False)
     # last date please
-
     for treatment in dataInsulin:
         if (treatment.date > lastdate):
             logger.info(treatment)
